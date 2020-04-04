@@ -2,4 +2,4 @@
 *.lst
 *.bin
 *.elf
-
+.directory
