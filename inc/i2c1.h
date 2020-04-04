@@ -116,11 +116,11 @@ public:
         return x;
     }
 
-    uint8_t binToDec(uint8_t bin)
+    uint8_t DecToBinDec(uint8_t bin)
     {
         return ((bin/10)<<4)|(bin%10);
     }
-    uint8_t decToBin(uint8_t dec)
+    uint8_t BinDecToDec(uint8_t dec)
     {
         return ((dec>>4)*10+(0x0F&dec));
     }
@@ -134,6 +134,90 @@ public:
                         0x0F,0x0E,0x0D,0x0C,0x0B,
                         0x0A,0x09,0x08,0x07,0x06,
                         0x05,0x04,0x03,0x02,0x01};
+    typedef struct RTC1307
+    {
+        uint8_t sec=00;
+        uint8_t min=00;
+        uint8_t hour=14;
+        uint8_t day=6;
+        uint8_t date=4;
+        uint8_t month=4;
+        uint8_t year=20;
+    } rtc1307;
+    rtc1307 rtcWrite;
+    volatile rtc1307 rtcRead{0,0,0,0,0,0,0};
+    void rtc_write()
+    {
+        I2C1->CR1|=I2C_CR1_ACK;
+        I2C1->CR1|=I2C_CR1_START;
+        while(!(I2C1->SR1&I2C_SR1_SB)); //пока не появится старт бит
+        void(I2C1->SR1); //сбрасываем старт бит
+        I2C1->DR=0xD0; //записываем адрес (0b1101) 1307 + бит записи
+        while (!(I2C1->SR1 & I2C_SR1_ADDR));	//ждем пока пошлется адрес
+        void(I2C1->SR1);
+        void(I2C1->SR2); // двумя считываниями сбрасываем бит адреса
+        I2C1->DR=0x00; //записываем первый адрес регистра 1307
+        while(!(I2C1->SR1&I2C_SR1_TXE));
+        //******* последовательно записываем 7 регистров значениями из структуры rtcWrite
+        I2C1->DR = DecToBinDec(rtcWrite.sec); //записываем секунды + бит запуска 1307 (0x80)|
+        while (!(I2C1->SR1 & I2C_SR1_BTF)); //ждем окончания передачи
+        I2C1->DR = DecToBinDec(rtcWrite.min);
+        while (!(I2C1->SR1 & I2C_SR1_BTF)); //ждем окончания передачи
+        I2C1->DR = DecToBinDec(rtcWrite.hour); // бит 24 форматного времени (0x40)|
+        while (!(I2C1->SR1 & I2C_SR1_BTF)); //ждем окончания передачи
+        I2C1->DR = DecToBinDec(rtcWrite.day);
+        while (!(I2C1->SR1 & I2C_SR1_BTF)); //ждем окончания передачи
+        I2C1->DR = DecToBinDec(rtcWrite.date);
+        while (!(I2C1->SR1 & I2C_SR1_BTF)); //ждем окончания передачи
+        I2C1->DR = DecToBinDec(rtcWrite.month);
+        while (!(I2C1->SR1 & I2C_SR1_BTF)); //ждем окончания передачи
+        I2C1->DR = DecToBinDec(rtcWrite.year);
+        while (!(I2C1->SR1 & I2C_SR1_BTF)); //ждем окончания передачи
+        I2C1->CR1|=I2C_CR1_STOP;
+    }
+    void rtc_read()
+    {
+        I2C1->CR1|=I2C_CR1_ACK;
+        I2C1->CR1|=I2C_CR1_START;
+        while(!(I2C1->SR1&I2C_SR1_SB)); //пока не появится старт бит
+        void(I2C1->SR1); //сбрасываем старт бит
+        I2C1->DR=0xD0; //записываем адрес (0b1101) 1307 + бит записи
+        while (!(I2C1->SR1 & I2C_SR1_ADDR));	//ждем пока пошлется адрес
+        void(I2C1->SR1);
+        void(I2C1->SR2); // двумя считываниями сбрасываем бит адреса
+        I2C1->DR=0x00; //записываем первый адрес регистра 1307
+        while(!(I2C1->SR1&I2C_SR1_TXE));
+        I2C1->CR1|=I2C_CR1_START;
+        while(!(I2C1->SR1&I2C_SR1_SB)); //пока не появится старт бит
+        void(I2C1->SR1); //сбрасываем старт бит
+        I2C1->DR=0xD1; //записываем адрес (0b1101) 1307 + бит чтения
+        while (!(I2C1->SR1 & I2C_SR1_ADDR));	//ждем пока пошлется адрес
+        void(I2C1->SR1);
+        void(I2C1->SR2); // двумя считываниями сбрасываем бит адреса        
+        //******* последовательно считываем 7 регистров значениями в структуру rtcRead
+        I2C1->CR1|=I2C_CR1_ACK;
+        while(!(I2C1->SR1&I2C_SR1_RXNE));
+        rtcRead.sec = BinDecToDec(I2C1->DR);//BinDecToDec(I2C1->DR); //записываем секунды + бит запуска 1307 (0x80)|
+        I2C1->CR1|=I2C_CR1_ACK;
+        while(!(I2C1->SR1&I2C_SR1_RXNE));
+        rtcRead.min = BinDecToDec(I2C1->DR);
+        I2C1->CR1|=I2C_CR1_ACK;
+        while(!(I2C1->SR1&I2C_SR1_RXNE));
+        rtcRead.hour = BinDecToDec(I2C1->DR);
+        I2C1->CR1|=I2C_CR1_ACK;
+        while(!(I2C1->SR1&I2C_SR1_RXNE));
+        rtcRead.day = BinDecToDec(I2C1->DR);
+        I2C1->CR1|=I2C_CR1_ACK;
+        while(!(I2C1->SR1&I2C_SR1_RXNE));
+        rtcRead.date = BinDecToDec(I2C1->DR);
+        I2C1->CR1|=I2C_CR1_ACK;
+        while(!(I2C1->SR1&I2C_SR1_RXNE));
+        rtcRead.month = BinDecToDec(I2C1->DR);
+        I2C1->CR1&=~I2C_CR1_ACK;                //NACK
+        while(!(I2C1->SR1&I2C_SR1_RXNE));
+        rtcRead.year = BinDecToDec(I2C1->DR);        
+        I2C1->CR1|=I2C_CR1_STOP;
+    }
 
 private:
     void i2c1_iniSM()
@@ -193,8 +277,4 @@ private:
         I2C1->CR1|=I2C_CR1_PE; //включаем
     }
 };
-
-
-
-
 #endif //I2C1_H_

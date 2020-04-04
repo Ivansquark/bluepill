@@ -35,36 +35,26 @@ int main()
 	//GPIOC->BSRR=GPIO_BSRR_BR13;
 	master.cs_idle();
 	master.cs_set();
-	I2Cmast.writeBytes(0x0000,I2Cmast.arrDefault,20);
-	//for(volatile int i=0;i<32;i++)
-	//{
-	//	I2Cmast.writeByte(0x0100+8*i,i);
-	//	delay_ms(10);
-	//}
+	//I2Cmast.writeBytes(0x0000,I2Cmast.arrDefault,20);
+	I2Cmast.rtc_write();
 	delay_ms(10);
 	//I2Cmast.writeByte(0x0088,99);
 	//I2Cmast.writeByte(0x0000,12);
 	delay_ms(10);
-	//for(volatile int i=0;i<32;i++)
-	//{
-	//	I2Cmast.arr[i]=I2Cmast.readByte(0x0000+i);
-	//	delay_ms(10);
-	//}
-	I2Cmast.readBytes(0x0000,20);
+	
+	//I2Cmast.readBytes(0x0000,20);
 	//I2Cmast.arr[0]=I2Cmast.readByte(0x004A);
-	//I2Cmast.arr[1]=I2Cmast.readByte(0x0052);
 	
 	while(1)
 	{
 		//I2Cmast.writeByte(0x0000,0x07);
-		for(uint8_t i=0;i<20;i++)
-		{
-			delay_ms(100);
-			//master.sendByte(I2Cmast.readByte(0x0000));
-			master.sendByte(I2Cmast.arr[i]);
-			delay_ms(100);
-			GPIOC->ODR^=GPIO_ODR_ODR13;
-		}
+		I2Cmast.rtc_read();
+		delay_ms(500);
+		//master.sendByte(I2Cmast.readByte(0x0000));
+		master.sendByte(I2Cmast.rtcRead.year);
+		delay_ms(500);
+		GPIOC->ODR^=GPIO_ODR_ODR13;
+		
 		//char* str="opa\n";
 		//usart1_send(c);
 		//usart1_sendSTR(str);
