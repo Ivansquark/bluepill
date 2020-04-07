@@ -3,6 +3,7 @@ void rcc_ini();
 void rcc_ini()
 {
     //RCC->CR|=RCC_CR_HSION;
+
     RCC->CFGR&=~RCC_CFGR_SW; //SW=00 - HSI selected as system clock
     RCC->CR&=~RCC_CR_PLLON;  //выключаем PLL чтобы можно было бы записывать в PLLCFGR
     RCC->CFGR=0;//обнуляем регистр настройки частоты

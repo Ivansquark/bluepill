@@ -27,11 +27,19 @@ public:
         //*(uint8_t*)SPI1->DR=data;
         while((SPI2->SR&SPI_SR_BSY)){}
     }
+    void sendBytes(volatile uint8_t* data)
+    {
+        for(uint8_t i=0;i<7;i++)
+        {
+            while(!(SPI2->SR&SPI_SR_TXE)){}        
+            SPI2->DR=*(data+i);
+            //*(uint8_t*)SPI1->DR=data;
+            while((SPI2->SR&SPI_SR_BSY)){}            
+        }
+    }
 private:
     void spi2_ini()
     {
-        
-
         //************ Настройка SPI - master ***************************
         RCC->APB1ENR|=RCC_APB1ENR_SPI2EN;
         SPI2->CR1|=SPI_CR1_BR_2|SPI_CR1_BR_1; // 0:0:0  psk=2 => 24MHz/128  => spi rate

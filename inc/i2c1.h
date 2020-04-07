@@ -3,6 +3,9 @@
 
 #include "main.h"
 
+extern "C" void TIM3_IRQHandler(void);
+//**********************************************************
+
 class I2C1_master
 {
 public:
@@ -10,8 +13,9 @@ public:
     {
         if(x==0){ i2c1_iniSM();}  //100 kHz
         else {i2c1_iniFM();}      //400 kHz
+        timer3_ini();
     }
-    //void writeBytes(uint16_t addr,const uint8_t *buf, uint16_t size)
+    static volatile bool timeFlag;
     void writeBytes(uint16_t addr,const uint8_t* buf,uint16_t size)
     {   
         I2C2->CR1|=I2C_CR1_ACK;
@@ -137,8 +141,8 @@ public:
     typedef struct RTC1307
     {
         uint8_t sec=00;
-        uint8_t min=00;
-        uint8_t hour=14;
+        uint8_t min=58;
+        uint8_t hour=17;
         uint8_t day=6;
         uint8_t date=4;
         uint8_t month=4;
@@ -228,14 +232,13 @@ private:
         GPIOB->CRL|=GPIO_CRL_MODE6|GPIO_CRL_CNF6; //1:1 1:1 alt func open drain max speed
         GPIOB->CRL|=GPIO_CRL_MODE7|GPIO_CRL_CNF7; //1:1 1:1 alt func open drain max speed
         GPIOB->BSRR=GPIO_BSRR_BS6|GPIO_BSRR_BS7;
-        //********** настройка I2C1 24 MHz - шина *********************        
-        //I2C1->CR1 |= I2C_CR1_SWRST;
-        //I2C1->CR1 &= ~I2C_CR1_SWRST;
+        //********** настройка I2C1 24 MHz - шина *********************   
         RCC->APB1ENR|=RCC_APB1ENR_I2C1EN;
         //I2C1->CR1&=~I2C_CR1_PE; //выключаем
         I2C1->CR1|=I2C_CR1_ACK; //ACK в ответе       генерировать условие ACK после приёма байтов
         I2C1->CR2&=~I2C_CR2_FREQ; // сбрасываем;
         I2C1->CR2|=24; //  Peripheral clock frequency - устанавливаем частоту 
+        //I2C1->CR2|=I2C_CR2_ITEVTEN; // включаем прерывания по событию 
         // TPCLK1 = 42ns
         I2C1->CCR&=~I2C_CCR_CCR; //обнуляем CCR - значения контроля частоты
         I2C1->CCR&=~I2C_CCR_FS; //0: Sm mode I2C     1: Fm mode I2C
@@ -247,6 +250,8 @@ private:
         I2C1->CCR|=120;
         //TRISE: Tr=1000ns (max rise time) => TRISE=(Tr/TPCLK1)+1=24;
         I2C1->TRISE=22;  //максимальное время => заносим немного меньшее
+        //NVIC_EnableIRQ(I2C1_EV_IRQn);
+        //NVIC_SetPriority(I2C1_EV_IRQn, 1);
         I2C1->CR1|=I2C_CR1_PE; //включаем        
     }
     void i2c1_iniFM()
@@ -272,9 +277,31 @@ private:
         // CCR*(TPCLK1*(9+16))=2500ns => CCR=2500ns/(25*TPCLK1)=100/42=2
         // CCR=2               (if DUTY=0 =>CCR=17)
         I2C1->CCR|=2;
+        //I2C1->CR2|=I2C_CR2_ITEVTEN; // включаем прерывания по событию 
+
         //TRISE: Tr=300ns (max rise time) => TRISE=(Tr/TPCLK1)+1=8;
         I2C1->TRISE=6; //максимальное время => заносим немного меньшее
+        //NVIC_EnableIRQ(I2C1_EV_IRQn);
+        //NVIC_SetPriority(I2C1_EV_IRQn, 1);
         I2C1->CR1|=I2C_CR1_PE; //включаем
     }
+    void timer3_ini()
+    {
+        RCC->APB1ENR|=RCC_APB1ENR_TIM3EN;
+        //TIM3->CR1|=TIM_CR1_ARPE;
+        TIM3->PSC=48000; //24000000 Hz APB PSC=2 =>  1000 Hz Timer3 frequency
+        TIM3->ARR = 500;  // 200ms
+        TIM3->DIER|=TIM_DIER_UIE; // прерывание по переполнению
+        TIM3->CR1|=TIM_CR1_CEN; //включаем таймер
+        NVIC_EnableIRQ(TIM3_IRQn);     
+    }
 };
+volatile bool I2C1_master::timeFlag=0;
+extern "C" void TIM3_IRQHandler(void)
+{
+    TIM3->SR &=~ TIM_SR_UIF; // сбрасываем флаг прерывания таймера
+    I2C1_master::timeFlag=1;
+    //GPIOC->ODR^=GPIO_ODR_ODR13;
+    //GPIOC->BSRR|=GPIO_BSRR_BS13;
+    }
 #endif //I2C1_H_
